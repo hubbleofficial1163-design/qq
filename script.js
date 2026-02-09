@@ -128,21 +128,121 @@ function updateCountdown() {
 updateCountdown();
 setInterval(updateCountdown, 1000);
 
-// Обработка формы
+// Обработка формы с отправкой в Google Таблицы
 const guestForm = document.querySelector('.guest-form');
 if (guestForm) {
-    guestForm.addEventListener('submit', function(e) {
+    guestForm.addEventListener('submit', async function(e) {
         e.preventDefault();
         
         // Получаем данные формы
         const formData = new FormData(this);
         const data = Object.fromEntries(formData.entries());
         
-        // Здесь обычно отправка данных на сервер
-        // В демо-версии просто показываем уведомление
-        alert(`Спасибо, ${data.fullname}! Ваше присутствие подтверждено до 01.05.2026.\nМы свяжемся с вами по номеру ${data.phone}.`);
+        // Показываем индикатор загрузки
+        const submitBtn = this.querySelector('.submit-btn');
+        const originalText = submitBtn.textContent;
+        submitBtn.textContent = 'Отправка...';
+        submitBtn.disabled = true;
         
-        // Сбрасываем форму
-        this.reset();
+        try {
+            // URL вашего Google Apps Script веб-приложения
+            // ЗАМЕНИТЕ НА ВАШ РЕАЛЬНЫЙ URL ПОСЛЕ РАЗВЕРТЫВАНИЯ СКРИПТА
+            const scriptUrl = 'https://script.google.com/macros/s/AKfycbwy-93x3usjnFQ8RI17cCScbQMz73efVkp36RJOnyRyG7nWDh8vuIzIZSlrDtPO7LEI/exec';
+            
+            // Отправляем данные на сервер
+            const response = await fetch(scriptUrl, {
+                method: 'POST',
+                mode: 'no-cors', // Важно для Google Apps Script
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(data)
+            });
+            
+            // Поскольку мы используем no-cors, мы не можем прочитать ответ
+            // Но мы знаем, что запрос отправлен
+            
+            // Показываем сообщение об успехе
+            showNotification(`Спасибо, ${data.fullname}! Ваше присутствие подтверждено до 01.05.2026.`, 'success');
+            
+            // Сбрасываем форму
+            this.reset();
+            
+        } catch (error) {
+            // Показываем сообщение об ошибке
+            showNotification('Произошла ошибка при отправке. Пожалуйста, попробуйте еще раз.', 'error');
+            console.error('Ошибка:', error);
+        } finally {
+            // Восстанавливаем кнопку
+            submitBtn.textContent = originalText;
+            submitBtn.disabled = false;
+        }
     });
+}
+
+// Функция для показа уведомлений
+function showNotification(message, type = 'success') {
+    // Создаем элемент уведомления
+    const notification = document.createElement('div');
+    notification.className = `notification ${type}`;
+    notification.innerHTML = `
+        <div class="notification-content">
+            <span class="notification-icon">${type === 'success' ? '✓' : '⚠'}</span>
+            <span class="notification-text">${message}</span>
+        </div>
+    `;
+    
+    // Стили для уведомления
+    notification.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: ${type === 'success' ? '#4CAF50' : '#f44336'};
+        color: white;
+        padding: 15px 20px;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        z-index: 10000;
+        animation: slideIn 0.3s ease-out;
+        max-width: 400px;
+    `;
+    
+    // Добавляем стили для анимации
+    if (!document.querySelector('#notification-styles')) {
+        const style = document.createElement('style');
+        style.id = 'notification-styles';
+        style.textContent = `
+            @keyframes slideIn {
+                from { transform: translateX(100%); opacity: 0; }
+                to { transform: translateX(0); opacity: 1; }
+            }
+            @keyframes slideOut {
+                from { transform: translateX(0); opacity: 1; }
+                to { transform: translateX(100%); opacity: 0; }
+            }
+            .notification-content {
+                display: flex;
+                align-items: center;
+                gap: 10px;
+            }
+            .notification-icon {
+                font-size: 1.2rem;
+                font-weight: bold;
+            }
+        `;
+        document.head.appendChild(style);
+    }
+    
+    // Добавляем уведомление на страницу
+    document.body.appendChild(notification);
+    
+    // Удаляем уведомление через 5 секунд
+    setTimeout(() => {
+        notification.style.animation = 'slideOut 0.3s ease-out';
+        setTimeout(() => {
+            if (notification.parentNode) {
+                notification.parentNode.removeChild(notification);
+            }
+        }, 300);
+    }, 5000);
 }
